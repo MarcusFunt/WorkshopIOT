@@ -1,0 +1,10 @@
+# Arduino build artifacts
+build/
+.pio/
+*.hex
+*.elf
+*.eep
+*.bin
+*.map
+*.dSYM/
+.DS_Store
