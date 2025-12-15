@@ -1,0 +1,110 @@
+esphome:
+  name: air-quality-notifier
+  friendly_name: Air Quality Notifier
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Networking
+wifi:
+  ssid: "<your-ssid>"
+  password: "<your-password>"
+  ap:
+    ssid: "Air Quality Notifier Fallback"
+    password: "airquality"
+
+logger:
+api:
+ota:
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: true
+
+# Notification LEDs
+light:
+  - platform: neopixelbus
+    type: GRB
+    variant: WS2812
+    pin: GPIO5
+    num_leds: 20
+    name: "Air Quality Indicator"
+    id: air_quality_indicator
+    restore_mode: ALWAYS_ON
+
+# SEN54 environmental sensor
+sensor:
+  - platform: sen54
+    id: sen54_sensor
+    temperature:
+      name: "SEN54 Temperature"
+      id: sen54_temperature
+    humidity:
+      name: "SEN54 Humidity"
+      id: sen54_humidity
+    pm_1_0:
+      name: "SEN54 PM1.0"
+    pm_2_5:
+      name: "SEN54 PM2.5"
+      id: sen54_pm25
+      on_value:
+        then:
+          - script.execute: update_indicator
+    pm_4_0:
+      name: "SEN54 PM4.0"
+    pm_10_0:
+      name: "SEN54 PM10"
+    voc:
+      name: "SEN54 VOC Index"
+      id: sen54_voc
+
+# 2x16 LCD via PCF8574 backpack
+output:
+  - platform: gpio
+    pin: GPIO16
+    id: lcd_backlight
+
+switch:
+  - platform: output
+    name: "LCD Backlight"
+    output: lcd_backlight
+    restore_mode: ALWAYS_ON
+
+display:
+  - platform: lcd_pcf8574
+    dimensions: 16x2
+    address: 0x27
+    lambda: |-
+      it.printf(0, 0, "PM2.5:%5.1f ug/m3", id(sen54_pm25).state);
+      it.printf(0, 1, "T:%4.1fC H:%4.1f%%", id(sen54_temperature).state, id(sen54_humidity).state);
+
+script:
+  - id: update_indicator
+    mode: restart
+    then:
+      - lambda: |-
+          const float pm25 = id(sen54_pm25).state;
+          ESPColor color = Color(0, 255, 0);   // Default: good (green)
+          if (!isnan(pm25)) {
+            if (pm25 < 12.0f) {
+              color = Color(0, 255, 0);        // Good
+            } else if (pm25 < 35.0f) {
+              color = Color(255, 160, 0);      // Moderate
+            } else if (pm25 < 55.0f) {
+              color = Color(255, 80, 0);       // Unhealthy for sensitive groups
+            } else {
+              color = Color(255, 0, 0);        // Unhealthy
+            }
+          }
+          auto call = id(air_quality_indicator).turn_on();
+          call.set_brightness(1.0f);
+          call.set_rgb(color.r / 255.0f, color.g / 255.0f, color.b / 255.0f);
+          call.perform();
+
+interval:
+  - interval: 10s
+    then:
+      - script.execute: update_indicator
