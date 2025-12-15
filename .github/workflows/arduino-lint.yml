@@ -1,0 +1,30 @@
+name: Arduino Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    name: Run arduino-lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Cache arduino-lint data
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino-lint
+          key: ${{ runner.os }}-arduino-lint-${{ hashFiles('**/*.ino', '**/*.h', '**/*.hpp', '**/*.c', '**/*.cpp') }}
+          restore-keys: |
+            ${{ runner.os }}-arduino-lint-
+
+      - name: Install arduino-lint
+        run: |
+          curl -fsSL https://arduino.github.io/arduino-lint/install.sh | sh
+          echo "$HOME/.arduino-lint/bin" >> $GITHUB_PATH
+
+      - name: Run arduino-lint
+        run: arduino-lint . --recursive --warnings-as-errors
