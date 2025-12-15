@@ -1,0 +1,47 @@
+mqtt:
+  sensor:
+    - name: "MR60BHA1 Distance"
+      state_topic: "homeassistant/xiao/mr60bha1/distance_m"
+      unit_of_measurement: "m"
+      device_class: distance
+      expire_after: 120
+    - name: "MR60BHA1 Heart Rate"
+      state_topic: "homeassistant/xiao/mr60bha1/heart_rate_bpm"
+      unit_of_measurement: "bpm"
+      expire_after: 120
+    - name: "MR60BHA1 Breath Rate"
+      state_topic: "homeassistant/xiao/mr60bha1/breath_rate_bpm"
+      unit_of_measurement: "bpm"
+      expire_after: 120
+    - name: "MR60BHA1 Breath State"
+      state_topic: "homeassistant/xiao/mr60bha1/breath_state"
+      expire_after: 120
+    - name: "MR60BHA1 Activity"
+      state_topic: "homeassistant/xiao/mr60bha1/activity"
+      expire_after: 120
+    - name: "MR60BHA1 Snapshot"
+      state_topic: "homeassistant/xiao/mr60bha1/state"
+      value_template: "{{ value_json }}"
+      expire_after: 120
+
+  binary_sensor:
+    - name: "MR60BHA1 Presence"
+      state_topic: "homeassistant/xiao/mr60bha1/presence"
+      payload_on: "occupied"
+      payload_off: "clear"
+      device_class: occupancy
+      expire_after: 120
+
+# Optionally expose the JSON snapshot as separate entities using templates
+  template:
+    - sensor:
+        - name: "MR60BHA1 Presence Text"
+          state: "{{ 'occupied' if (state_attr('sensor.mr60bha1_snapshot', 'presence') == 'occupied') else 'clear' }}"
+          availability: "{{ not is_state('sensor.mr60bha1_snapshot', 'unavailable') }}"
+        - name: "MR60BHA1 Activity Text"
+          state: "{{ state_attr('sensor.mr60bha1_snapshot', 'activity') }}"
+          availability: "{{ not is_state('sensor.mr60bha1_snapshot', 'unavailable') }}"
+        - name: "MR60BHA1 Distance from Snapshot"
+          unit_of_measurement: "m"
+          state: "{{ state_attr('sensor.mr60bha1_snapshot', 'distance_m') | float(0) }}"
+          availability: "{{ not is_state('sensor.mr60bha1_snapshot', 'unavailable') }}"
