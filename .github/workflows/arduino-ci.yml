@@ -1,12 +1,13 @@
 name: Arduino CI
 
 on:
-  pull_request:
   push:
-    branches: [ main ]
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
 
 jobs:
-  compile:
+  build:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -14,6 +15,7 @@ jobs:
         board:
           - arduino:avr:uno
           - arduino:avr:nano
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,41 +24,34 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.arduino15
-            ~/.cache/arduino
-          key: arduino-${{ runner.os }}-${{ matrix.board }}-${{ hashFiles('**/arduino-cli.yaml') }}
+            ~/.arduino15/packages
+            ~/.arduino15/staging
+            ~/.cache/arduino-cli
+          key: ${{ runner.os }}-arduino-${{ hashFiles('arduino/**/*.ino') }}
           restore-keys: |
-            arduino-${{ runner.os }}-${{ matrix.board }}-
-            arduino-${{ runner.os }}-
+            ${{ runner.os }}-arduino-
 
-      - name: Install arduino-cli
-        uses: arduino/setup-arduino-cli@v2
-
-      - name: Configure core index
+      - name: Install Arduino CLI
         run: |
-          arduino-cli config init --overwrite
-          arduino-cli config set library.enable_unsafe_install true
-          arduino-cli config set library.additional_urls ""
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+          sudo mv bin/arduino-cli /usr/local/bin/
+          arduino-cli version
+
+      - name: Configure Arduino cores
+        run: |
           arduino-cli core update-index
-
-      - name: Install AVR core
-        run: |
           arduino-cli core install arduino:avr
 
       - name: Compile Arduino sketches
-        env:
-          BOARD_FQBN: ${{ matrix.board }}
-          ARDUINO_LIBRARY_ENABLE_UNSAFE_INSTALL: true
         run: |
           set -euo pipefail
           shopt -s nullglob
           sketches=(arduino/*/*.ino)
           if [ ${#sketches[@]} -eq 0 ]; then
-            echo "No sketches found"
+            echo "No sketches found in arduino/*/*.ino"
             exit 0
           fi
-
           for sketch in "${sketches[@]}"; do
-            echo "Compiling ${sketch} for ${BOARD_FQBN}"
-            arduino-cli compile --fqbn "${BOARD_FQBN}" --libraries "${GITHUB_WORKSPACE}/arduino/libraries" "${sketch}"
+            echo "Compiling $sketch for ${{ matrix.board }}"
+            arduino-cli compile --fqbn ${{ matrix.board }} "$sketch"
           done
