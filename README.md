@@ -33,3 +33,13 @@ This repository hosts a growing collection of Arduino sketches for automating co
 
 - Add CI that compiles sketches with `arduino-cli`.
 - Include board-specific `arduino-cli.yaml` profiles to streamline local builds.
+
+## Continuous Integration
+
+This repository uses [arduino-lint](https://github.com/arduino/arduino-lint) to catch common sketch and library issues. Every
+push or pull request runs `.github/workflows/arduino-lint.yml`, which:
+
+- Installs `arduino-lint` via the official install script.
+- Caches the `~/.arduino-lint` directory to speed subsequent runs.
+- Executes `arduino-lint . --recursive --fail-on-warnings` to lint all sketches and shared libraries, failing the build on
+  warnings.
