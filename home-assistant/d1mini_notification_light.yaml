@@ -1,0 +1,116 @@
+esphome:
+  name: wemos-d1mini-notify
+  friendly_name: Wemos D1 Mini Notification Light
+
+esp8266:
+  board: d1_mini
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key_d1mini_notify
+  services:
+    - service: notify_event
+      variables:
+        event: string
+      then:
+        - lambda: |-
+            auto call = id(notification_ring).turn_on();
+            call.set_brightness(1.0f);
+            if (event == "arrival") {
+              call.set_effect("Aurora Sweep");
+            } else if (event == "urgent") {
+              call.set_effect("Red Comets");
+            } else if (event == "reminder") {
+              call.set_effect("Calm Pulse");
+            } else if (event == "off") {
+              call.set_transition_length(300);
+              call.set_brightness(0.0f);
+            } else {
+              // Default to gentle idle glow if an unknown event is sent.
+              call.set_effect("Idle Glow");
+            }
+            call.perform();
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true
+
+  ap:
+    ssid: "Wemos-D1Mini-Notify"
+    password: !secret fallback_ap_password
+
+captive_portal:
+
+ota:
+
+light:
+  - platform: neopixelbus
+    id: notification_ring
+    name: "Notification Ring"
+    pin: D4
+    num_leds: 20
+    type: GRB
+    default_transition_length: 0s
+    restore_mode: ALWAYS_ON
+    effects:
+      - addressable_lambda:
+          name: "Aurora Sweep"
+          update_interval: 16ms
+          lambda: |-
+            static float offset = 0.0f;
+            offset += (delta / 1000.0f) * 1.3f;
+            for (int i = 0; i < it.size(); i++) {
+              float pos = float(i) / float(it.size());
+              float wave = 0.5f + 0.5f * sinf((pos * 6.2831f * 2.0f) + offset);
+              float hue = fmodf(offset * 90.0f + pos * 140.0f, 360.0f);
+              auto color = Color::fromHSV(hue, 0.85f, 0.25f + wave * 0.55f);
+              it[i] = color;
+            }
+      - addressable_lambda:
+          name: "Red Comets"
+          update_interval: 12ms
+          lambda: |-
+            static float head = 0.0f;
+            head += (delta / 1000.0f) * 22.0f;
+            if (head > it.size()) head -= it.size();
+
+            for (int i = 0; i < it.size(); i++) {
+              float distance = fabsf(head - i);
+              if (distance > it.size() / 2) {
+                distance = it.size() - distance;  // wrap distance for ring effect
+              }
+              float trail = 1.0f - (distance / 4.5f);
+              if (trail < 0.0f) trail = 0.0f;
+              float flicker = 0.05f * sinf((head + i) * 0.6f + millis() / 120.0f);
+              it[i] = Color::fromHSV(0.0f, 0.95f, powf(trail, 1.8f) + flicker);
+            }
+      - addressable_lambda:
+          name: "Calm Pulse"
+          update_interval: 20ms
+          lambda: |-
+            static float phase = 0.0f;
+            phase += (delta / 1000.0f) * 1.1f;
+
+            float base_brightness = 0.18f + 0.12f * sinf(phase * 2.0f * 3.1415f);
+            for (int i = 0; i < it.size(); i++) {
+              float hue = 185.0f + 10.0f * sinf(phase + i * 0.3f);
+              float spark = 0.0f;
+              if (random_uint32() % 90 == 0) {
+                spark = 0.5f;  // occasional sparkle
+              }
+              float v = base_brightness + spark;
+              if (v > 0.7f) v = 0.7f;
+              it[i] = Color::fromHSV(hue, 0.25f, v);
+            }
+      - addressable_lambda:
+          name: "Idle Glow"
+          update_interval: 40ms
+          lambda: |-
+            static float t = 0.0f;
+            t += (delta / 1000.0f) * 0.6f;
+            float level = 0.08f + 0.06f * sinf(t);
+            auto color = Color::fromHSV(210.0f, 0.4f, level);
+            it.all() = color;
