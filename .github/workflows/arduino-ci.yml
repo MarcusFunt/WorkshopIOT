@@ -1,0 +1,56 @@
+name: Arduino CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Arduino CLI
+        id: arduino-cli
+        uses: arduino/setup-arduino-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Arduino packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15/packages
+            ~/.arduino15/cache
+            ~/.arduino15/library_index.json
+          key: ${{ runner.os }}-arduino-${{ steps.arduino-cli.outputs.arduino-cli-version }}-${{ hashFiles('**/*.ino') }}
+          restore-keys: |
+            ${{ runner.os }}-arduino-${{ steps.arduino-cli.outputs.arduino-cli-version }}-
+            ${{ runner.os }}-arduino-
+
+      - name: Install Arduino cores
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+
+      - name: Compile sketches
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          boards=("arduino:avr:uno" "arduino:avr:nano")
+          sketches=(arduino/*/*.ino)
+
+          if [ ${#sketches[@]} -eq 0 ]; then
+            echo "No sketches found; skipping compilation."
+            exit 0
+          fi
+
+          for board in "${boards[@]}"; do
+            echo "Compiling sketches for ${board}"
+            for sketch in "${sketches[@]}"; do
+              echo "- ${sketch}"
+              arduino-cli compile --fqbn "${board}" "${sketch}"
+            done
+          done
